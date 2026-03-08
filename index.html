@@ -100,13 +100,13 @@
 </head>
 <body>
   <div class="container">
-    <h1>Verificador de billetes • Serie A/B</h1>
+    <h1>Verificador de billetes • Serie B</h1>
     <p class="subtitle">Analiza foto, detecta Serie y Corte, y valida rangos (Serie B)</p>
 
     <button class="install-btn" id="installBtn" onclick="installPWA()">📲 Instalar App (Usar sin internet)</button>
 
     <div class="instruction-text">
-      1) Activa la cámara • 2) Toma 1 foto con varios billetes • 3) El sistema detecta series (A/B), identifica corte (Bs 10/20/50) y valida.
+      1) Activa la cámara • 2) Toma 1 foto con varios billetes • 3) El sistema detecta series (B), identifica corte (Bs 10/20/50) y valida.
     </div>
 
     <div class="multiple-indicator" id="multipleIndicator">📸 Modo múltiple activado</div>
@@ -155,7 +155,7 @@
         </select>
         <button onclick="checkManual()">Verificar</button>
       </div>
-      <small style="color:#566">Reglas: Serie A ⇒ siempre válido. Serie B ⇒ valida contra rangos inhabilitados por corte.</small>
+      <small style="color:#566">Reglas:Serie B ⇒ valida contra rangos inhabilitados por corte.</small>
     </div>
 
     <div class="bottom-section">
@@ -191,4 +191,5 @@
   <script type="module" src="./app.js"></script>
 </body>
 </html>
+
 
