@@ -32,69 +32,93 @@ window.installPWA = function installPWA() {
 }
 
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/sw.js').catch(() => {});
+  // en GitHub Pages (proyecto), usa rutas relativas y scope local
+  navigator.serviceWorker.register('./sw.js', { scope: './' })
+    .catch(() => {});
+
 }
 
 // Cámara
 window.startCamera = async function startCamera() {
   try {
-    const constraints = {
+    // 1) Prueba perfil alto (trasera, HD)
+    let constraints = {
       video: {
         facingMode: { ideal: 'environment' },
         width: { ideal: 1920 },
         height: { ideal: 1080 }
-      }
+      },
+      audio: false
     };
-    stream = await navigator.mediaDevices.getUserMedia(constraints);
-    track = stream.getVideoTracks()[0];
-    const video = $('#video');
-    video.srcObject = stream;
-    show(video);
-    hide($('#placeholder'));
-    show($('#captureBtn'));
-    show($('#stopBtn'));
-    show($('#scanOverlay'));
-    show($('#multipleIndicator'));
 
-    const torchBtn = $('#torchBtn');
-    show(torchBtn);
-    const capabilities = track.getCapabilities ? track.getCapabilities() : {};
-    if (!capabilities.torch) {
-      torchBtn.disabled = true; torchBtn.title = 'Linterna no disponible'; torchBtn.style.opacity = '0.3';
-    } else {
-      torchBtn.disabled = false; torchBtn.title = 'Encender linterna'; torchBtn.style.opacity = '1';
+    let localStream;
+    try {
+      localStream = await navigator.mediaDevices.getUserMedia(constraints);
+    } catch (e1) {
+      // 2) Degradar para dispositivos que no soportan el perfil anterior
+      constraints = { video: { facingMode: 'environment' }, audio: false };
+      try {
+        localStream = await navigator.mediaDevices.getUserMedia(constraints);
+      } catch (e2) {
+        // 3) Último recurso: cualquier cámara disponible
+        constraints = { video: true, audio: false };
+        localStream = await navigator.mediaDevices.getUserMedia(constraints);
+      }
     }
-    await video.play();
+
+    stream = localStream;
+    track = stream.getVideoTracks()[0];
+
+    const video = document.getElementById('video');
+    video.srcObject = stream;
+    video.setAttribute('playsinline', 'true'); // iOS
+    video.muted = true;                        // algunos navegadores bloquean autoplay sin esto
+
+    // Mostrar UI
+    video.style.display = 'block';
+    document.getElementById('placeholder').style.display = 'none';
+    document.getElementById('captureBtn').style.display = 'block';
+    document.getElementById('stopBtn').style.display = 'block';
+    document.getElementById('scanOverlay').style.display = 'block';
+    document.getElementById('multipleIndicator').style.display = 'block';
+
+    // Torch (si disponible)
+    const torchBtn = document.getElementById('torchBtn');
+    torchBtn.style.display = 'block';
+    const capabilities = (track.getCapabilities && track.getCapabilities()) || {};
+    if (!capabilities.torch) {
+      torchBtn.disabled = true;
+      torchBtn.title = 'Linterna no disponible';
+      torchBtn.style.opacity = '0.3';
+    } else {
+      torchBtn.disabled = false;
+      torchBtn.title = 'Encender linterna';
+      torchBtn.style.opacity = '1';
+    }
+
+    // 🔴 Esperar a que el video tenga dimensiones
+    await new Promise((resolve) => {
+      if (video.readyState >= 2 && video.videoWidth > 0) return resolve();
+      const onLoaded = () => {
+        video.removeEventListener('loadedmetadata', onLoaded);
+        resolve();
+      };
+      video.addEventListener('loadedmetadata', onLoaded);
+    });
+
+    // Reajustar canvas tras conocer el tamaño real del video
+    const canvas = document.getElementById('canvas');
+    canvas.width  = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    // Play explícito (algunos navegadores lo requieren tras user-gesture)
+    try { await video.play(); } catch { /* ignore */ }
+
   } catch (err) {
-    alert('Error al acceder a la cámara: ' + err.message);
+    console.error('Error cámara:', err);
+    alert('No se pudo acceder a la cámara. Revisa permisos del sitio (Candado → Permisos) y vuelve a intentar.');
   }
-}
-
-window.stopCamera = function stopCamera() {
-  if (torchEnabled && track) toggleTorch();
-  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
-  track = null; torchEnabled = false;
-  hide($('#video')); show($('#placeholder'));
-  hide($('#captureBtn')); hide($('#stopBtn')); hide($('#scanOverlay')); hide($('#multipleIndicator'));
-  const torchBtn = $('#torchBtn'); hide(torchBtn); torchBtn.classList.remove('active'); torchBtn.textContent = '🔦';
-}
-
-window.toggleTorch = async function toggleTorch() {
-  if (!track || !track.applyConstraints) return;
-  try {
-    const caps = track.getCapabilities ? track.getCapabilities() : {};
-    if (!caps.torch) { alert('Tu dispositivo no soporta control de linterna'); return; }
-    torchEnabled = !torchEnabled;
-    await track.applyConstraints({ advanced: [{ torch: torchEnabled }] });
-    const btn = $('#torchBtn');
-    if (torchEnabled) { btn.classList.add('active'); btn.textContent = '💡'; btn.title = 'Apagar linterna'; }
-    else { btn.classList.remove('active'); btn.textContent = '🔦'; btn.title = 'Encender linterna'; }
-  } catch (e) {
-    alert('No se pudo controlar la linterna: ' + e.message);
-    torchEnabled = false; const btn = $('#torchBtn'); btn.classList.remove('active'); btn.textContent = '🔦';
-  }
-}
-
+};
 // --- Utilidades de color ---
 function rgbToHsv(r,g,b){
   r/=255; g/=255; b/=255;
